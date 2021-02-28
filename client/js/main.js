@@ -9,29 +9,30 @@ class StaticGroup extends Phaser.Physics.Arcade.StaticGroup	{	// TODO for large 
 
 // обоймы
 // увеличение разроса
-// подбор орудия с земли done
-// спрайты оружия на земле done
 // вариация урона в зависимости от пули
+// полная синхронизация
+console.log(Phaser.Bullet)
 
+var socket;
 class WeaponFactory {
-	static create(scene, type) {
+	static create(scene, owner, type) {
 		if (type === 'handgun')
-			return new Weapon(scene, type, 8, 500, 80, 1000, 2, false);
+			return new Weapon(scene, owner, type, 8, 500, 80, 1000, 2, false, false);
 		if (type === 'smg')
-			return new Weapon(scene, type, 30, 800, 30, 1500, 6, true);
+			return new Weapon(scene, owner, type, 30, 800, 30, 1500, 6, true, false);
 		if (type === 'shotgun')
-			return new Weapon(scene, type, 18, 750, 100, 1700, 20, false);
+			return new Weapon(scene, owner, type, 18, 750, 100, 1700, 20, false, true);
 		if (type === 'rifle')
-			return new Weapon(scene, type, 10, 2000, 300, 2000, 0, false);
+			return new Weapon(scene, owner, type, 10, 2000, 300, 2000, 0, false, false);
 		if (type === 'minigun')
-			return new Weapon(scene, type, 300, 1000, 5, 4000, 3, true);
+			return new Weapon(scene, owner, type, 300, 1000, 5, 4000, 3, true, false);
 	}
 }
 
 
 class Weapon {
 
-	constructor(scene, type, fireLimit, bulletSpeed, fireRate, reloadTime, bulletAngleVariance, fullAuto) {
+	constructor(scene, owner, type, fireLimit, bulletSpeed, fireRate, reloadTime, bulletAngleVariance, fullAuto, multiFire) {
 		let gun = scene.add.weapon(fireLimit, 'bullet');
 		gun.type = type
 		gun.debugPhysics = true;	// TODO remove
@@ -40,7 +41,7 @@ class Weapon {
 			gun.stopFire()
 			gun.empty = true
 		})
-		gun.trackSprite(scene.soldier, 0, 0, true);
+		gun.trackSprite(owner, 0, 0, true);
 
 		//  Because our bullet is drawn facing up, we need to offset its rotation:
 		gun.bulletAngleOffset = 90;
@@ -52,6 +53,7 @@ class Weapon {
 		gun.fireRate = fireRate;
 		gun.reloadTime = reloadTime;
 		gun.fullAuto = fullAuto;
+		//gun.multiFire = multiFire
 		gun.bulletAngleVariance = bulletAngleVariance;
 		gun.empty = false
 		gun.bulletKillType = WeaponPlugin.consts.KillType.KILL_WORLD_BOUNDS;
@@ -59,13 +61,20 @@ class Weapon {
 		gun.stopFire = this.stopFire.bind(gun)
 		gun.reload = this.reload.bind(gun)
 		gun.reloading = false
+		const playerObstacles = owner.name === scene.soldier.name ? 
+		Object.values(scene.enemies) :
+		[...Object.values(scene.enemies).filter(el => el.name !== owner.name), scene.soldier]
 		scene.physics.add.overlap(
-			scene.obstacles,
+			[...scene.obstacles, ...playerObstacles],
 			gun.bullets,
 			(actor, bullet) => {
 			  bullet.kill();
 			}
 		  );
+		gun.on(WeaponPlugin.events.WEAPON_FIRE, (bullet) => {
+			console.log('bullet', owner.name, scene.soldier.name)
+			if (owner.name === scene.soldier.name) socket.emit('bullet', bullet.body.velocity)
+		});
 		return gun
 	}
 	
@@ -90,7 +99,7 @@ class Weapon {
 			this.scene.sounds[this.type].setLoop(true)
 			this.autofire = true
 		} else {
-			if (this.type === 'shotgun') {
+			 if (this.type === 'shotgun') {
 				let tmp = this.fireRate
 				this.fireRate = 0;
 				for (let i = 0; i < this.fireLimit/2; i++) {
@@ -116,10 +125,9 @@ class Weapon {
 }
 
 class Soldier {
-	constructor(scene, speed, drag, health) {
-	const centerX = scene.cameras.main.width / 2 - 100;
-	const centerY = scene.cameras.main.height / 2 - 100;
-	let soldier = scene.physics.add.sprite(centerX, centerY, 'soldier');
+	constructor(scene, speed, drag, name, health, x = 200, y = 200) {
+	let soldier = scene.physics.add.sprite(x, y, 'soldier');
+	soldier.name = name || (+new Date * Math.random()).toString(36).substring(0,5) 
 	soldier.health = health
 	soldier.setCollideWorldBounds(true); 
 	soldier.setDrag(drag)
@@ -134,17 +142,20 @@ class Soldier {
 	soldier.startFire = this.startFire.bind(soldier)
 	soldier.stopFire = this.stopFire.bind(soldier)
 	soldier.pickUpWeapon = this.pickUpWeapon.bind(soldier)
+	soldier.setPushable(false)
 	return soldier
 	}
 	selectWeapon(newWeapon) {
 		this.weapon = newWeapon
-		this.scene.wb.setTexture(newWeapon.type);
 	}
 	pickUpWeapon(player, sprite) {
 		sprite.disableBody(true, true);
-		let newGun = WeaponFactory.create(player.scene, sprite.texture.key)
+		let newGun = WeaponFactory.create(player.scene, player, sprite.texture.key)
+		if (this.scene.soldier === player) this.scene.wb.setTexture(newGun.type);
+		else if (newGun.type === 'shotgun') newGun.multiFire = true;
 		this.selectWeapon(newGun)
 		this.ammunition.push(newGun)
+		console.log('pickUpweapon', this.ammunition)
 	}
 	startFire() {
 		this.weapon.startFire()
@@ -222,6 +233,7 @@ class ShooterGame extends Phaser.Scene
         this.pointer;
 		this.inputKeys;
 		this.gunsList;
+		this.enemies = {};
 	}
 
 	preload() {
@@ -248,7 +260,8 @@ class ShooterGame extends Phaser.Scene
 	}
 
 	create() {
-		// Install the weapon plugin
+		socket = io.connect();
+		// Install the weapon pluginClient
 		this.plugins.installScenePlugin(
 			'WeaponPlugin',
 			WeaponPlugin.WeaponPlugin,
@@ -292,13 +305,82 @@ class ShooterGame extends Phaser.Scene
 
 		this.obstacles.forEach(el=>el.setPushable(false))
 		this.hb = new HealthBar(this, 100, 0, 0);
-		this.soldier = new Soldier(this, 200, 2000, 100)
-		this.soldier.ammunition = [WeaponFactory.create(this, 'handgun')];
+		this.soldier = new Soldier(this, 200, 2000, null, 100)
+		this.soldier.ammunition = [WeaponFactory.create(this, this.soldier, 'handgun')];
 		this.wb = this.add.sprite(105, 9, 'handgun'),
 		this.soldier.selectWeapon(this.soldier.ammunition[0])
 		this.physics.add.overlap(this.soldier, this.pickedWeapons, this.soldier.pickUpWeapon);
 		this.physics.add.collider(this.soldier, this.obstacles);
 		this.addEvents();
+
+		// socket messages handle
+		socket.emit('addSoldier', this.soldier);
+
+		socket.on('setPosition', (enemyKey, x, y) => {
+			Object.assign(this.enemies[enemyKey], {x, y})
+		});
+		
+		socket.on("setRotation", (enemyKey, rotation) => {
+            this.enemies[enemyKey].rotation = rotation;
+        }); 
+
+		socket.on('addEnemy', (enemyKey) => {
+			this.addEnemy(enemyKey)
+		});
+
+		socket.on('removeEnemy', (enemyKey) => {
+			console.log('removeEnemy')
+			this.enemies[enemyKey].destroy(true)
+			// delete
+		});
+		
+		socket.on('getSoldierLocation', (socketID) => {
+			console.log('getSoldierLocation');
+			const { x, y, rotation, name } = this.soldier;
+			socket.emit('sendSoldierLocation', socketID, name, x, y, rotation);
+		});
+
+		socket.on('setEnemyLocation', (enemyKey, x, y, rotation) => {
+			console.log('setEnemyLocation');
+			Object.assign(this.enemies[enemyKey], {x, y, rotation})
+		});
+		
+		socket.on('getEnemies', (enemies) => {
+			console.log(enemies)
+			for (let enemy of enemies) {
+				this.addEnemy(enemy.name)
+			}
+		});
+		socket.on('bullet', (enemyKey, velocity) => {
+			let bullet = this.enemies[enemyKey].weapon.fire()
+			console.log('bullet')
+			if (bullet) bullet.body.setVelocity(velocity.x, velocity.y);
+		});
+		socket.on('reload', (enemyKey) => {
+            this.enemies[enemyKey].weapon.reload();        
+		});
+		socket.on('selectWeapon', (enemyKey, weaponIndex) => {
+			this.enemies[enemyKey].selectWeapon(this.enemies[enemyKey].ammunition[weaponIndex])      
+		});
+
+	}
+
+	addEnemy (enemyKey) {
+		console.log(enemyKey)
+		let enemy = new Soldier(this, 200, 2000, enemyKey, 100)
+		this.enemies[enemyKey] = enemy
+		enemy.ammunition = [WeaponFactory.create(this, enemy, 'handgun')];
+		enemy.selectWeapon(enemy.ammunition[0])
+		this.physics.add.collider(this.soldier, enemy);
+		this.physics.add.overlap(enemy, this.pickedWeapons, enemy.pickUpWeapon);
+		// this.physics.add.overlap(
+		// 	this.soldier,
+		// 	enemy.ammunition[0].bullets,
+		// 	(actor, bullet) => {
+		// 	  bullet.kill();
+		// 	}
+		//   );
+		return enemy
 	}
 
 	addEvents() {
@@ -306,6 +388,7 @@ class ShooterGame extends Phaser.Scene
 		this.input.on('pointermove', (pointer) => {
             const rotation = Phaser.Math.Angle.Between(this.soldier.x, this.soldier.y, pointer.x, pointer.y )
             this.soldier.rotation = rotation
+			socket.emit('sendRotation', rotation);
 			this.pointer = pointer;
 		});
 
@@ -314,11 +397,15 @@ class ShooterGame extends Phaser.Scene
 				this.sounds.empty.play()
 				return
 			} 
-			if (!this.soldier.weapon.reloading) this.soldier.startFire()
+			if (!this.soldier.weapon.reloading) {
+				this.soldier.startFire()
+				socket.emit("startFire");
+			}
 		});
         
 		this.input.on('pointerup', (pointer) => {
 			this.soldier.stopFire()
+			socket.emit('stopFire')
 		});
 
 		this.cursors = this.input.keyboard.addKeys(
@@ -339,6 +426,8 @@ class ShooterGame extends Phaser.Scene
 				if (index == this.scene.soldier.ammunition.length - 1) newIndex = 0
 			}
 			this.scene.soldier.selectWeapon(this.scene.soldier.ammunition[newIndex])
+			socket.emit('selectWeapon', newIndex)
+			this.scene.wb.setTexture(this.scene.soldier.ammunition[newIndex].type);
 		});	
 
 		
@@ -349,6 +438,7 @@ class ShooterGame extends Phaser.Scene
         let moving = false
 		if (this.cursors.reload.isDown) {
 			this.soldier.weapon.reload()
+			socket.emit('reload')
         }
         if (this.cursors.left.isDown) {
 			this.soldier.setVelocityX(-200);
@@ -372,6 +462,8 @@ class ShooterGame extends Phaser.Scene
         }
         if (moving) {
             this.soldier.anims.play('walk', true)
+			const {x, y} = this.soldier
+			socket.emit('sendPosition', x, y);
         } else {
             this.soldier.anims.play('walk', false)
         }
