@@ -11,8 +11,8 @@ class StaticGroup extends Phaser.Physics.Arcade.StaticGroup	{	// TODO for large 
 // увеличение разроса
 // вариация урона в зависимости от пули
 // полная синхронизация
-console.log(Phaser.Bullet)
-
+import Test from './class.js'
+console.log(Test)
 var socket;
 class WeaponFactory {
 	static create(scene, owner, type) {
@@ -68,6 +68,11 @@ class Weapon {
 			[...scene.obstacles, ...playerObstacles],
 			gun.bullets,
 			(actor, bullet) => {
+			  // console.log(actor, bullet.damage)
+			  if (actor.hb) {
+				  actor.hb.decrease(5)
+			  }
+			  // console.log(actor.health)
 			  bullet.kill();
 			}
 		  );
@@ -109,6 +114,7 @@ class Weapon {
 				this.fireRate = tmp
 			} else {
 				let bullet = this.fire()
+				console.log(bullet)
 				if (bullet) this.scene.sounds[this.type].play();
 			}
 
@@ -143,6 +149,7 @@ class Soldier {
 	soldier.stopFire = this.stopFire.bind(soldier)
 	soldier.pickUpWeapon = this.pickUpWeapon.bind(soldier)
 	soldier.setPushable(false)
+	soldier.hb = new HealthBar(scene, soldier, 100, 0, 0);
 	return soldier
 	}
 	selectWeapon(newWeapon) {
@@ -167,10 +174,10 @@ class Soldier {
 
 class HealthBar {
 
-    constructor (scene, value, x, y)
+    constructor (scene, soldier, value, x, y)
     {
         this.bar = new Phaser.GameObjects.Graphics(scene);
-
+		this.soldier = soldier;
         this.x = x;
         this.y = y;
         this.value = value;
@@ -184,14 +191,15 @@ class HealthBar {
     decrease (amount)
     {
         this.value -= amount;
-
+		this.soldier.health -= amount;
         if (this.value < 0)
         {
             this.value = 0;
         }
 
-        this.draw();
+		this.draw();
 
+		//if (this.value === 0) this.soldier.kill()
         return (this.value === 0);
     }
 
@@ -303,8 +311,7 @@ class ShooterGame extends Phaser.Scene
 			this.physics.add.sprite(centerX + 150, centerY + 150, 'minigun'),
 		];
 
-		this.obstacles.forEach(el=>el.setPushable(false))
-		this.hb = new HealthBar(this, 100, 0, 0);
+		this.obstacles.forEach(el => el.setPushable(false))
 		this.soldier = new Soldier(this, 200, 2000, null, 100)
 		this.soldier.ammunition = [WeaponFactory.create(this, this.soldier, 'handgun')];
 		this.wb = this.add.sprite(105, 9, 'handgun'),
