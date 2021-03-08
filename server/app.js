@@ -1,12 +1,16 @@
-const PORT = 3000
 const express = require("express")
 const http = require('http')
 const path = require('path')
 const app = express()
-const server = http.createServer(app);
-const io = require('socket.io')(server);
+
 app.use('/',express.static(path.join(__dirname , '../dist')));
-server.listen(PORT || 3000)
+
+const PORT = process.env.PORT || 80;
+const server = app.listen(PORT, function() {
+    let port = server.address().port;
+    console.log(`Server is listening at port ${port}`);
+});
+const io = require('socket.io')(server);
 
 const getAllEnemies = (soldierKey) => {
     var soldiers = [];
