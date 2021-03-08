@@ -1,144 +1,17 @@
-
-
-// TODO 
-
-// обоймы
-// увеличение разроса
-// вариация урона в зависимости от пули
-
-import Test from './class.js'
-
 import Phaser from 'phaser';
 import RexUIPlugin from 'phaser3-rex-plugins/templates/ui/ui-plugin'
-import { io } from "socket.io-client";
+
 import Soldier from "./classes/Soldier";
+import WeaponFactory from "./classes/WeaponFactory";
 import HealthBar from "./classes/HealthBar";
+import socket from "./socket";
 
 class StaticGroup extends Phaser.Physics.Arcade.StaticGroup	{	// TODO for large group of static objects
 	constructor(scene, children) {
 		super(scene.physics.world, scene);
 	}
 }
-
-var socket;
-class WeaponFactory {
-	static create(scene, owner, type) {
-		if (type === 'handgun')
-			return new Weapon(scene, owner, type, 8, 500, 80, 1000, 2, false, false);
-		if (type === 'smg')
-			return new Weapon(scene, owner, type, 30, 800, 30, 1500, 6, true, false);
-		if (type === 'shotgun')
-			return new Weapon(scene, owner, type, 18, 750, 100, 1700, 20, false, true);
-		if (type === 'rifle')
-			return new Weapon(scene, owner, type, 10, 2000, 300, 2000, 0, false, false);
-		if (type === 'minigun')
-			return new Weapon(scene, owner, type, 300, 1000, 5, 4000, 3, true, false);
-	}
-}
-
-
-class Weapon {
-
-	constructor(scene, owner, type, fireLimit, bulletSpeed, fireRate, reloadTime, bulletAngleVariance, fullAuto, multiFire) {
-		let gun = scene.add.weapon(fireLimit, 'bullet');
-		gun.type = type
-		gun.debugPhysics = true;	// TODO remove
-		gun.fireLimit = fireLimit
-		gun.on(WeaponPlugin.events.WEAPON_FIRE_LIMIT, () => {
-			gun.stopFire()
-			gun.empty = true
-		})
-		gun.trackSprite(owner, 0, 0, true);
-
-		//  Because our bullet is drawn facing up, we need to offset its rotation:
-		gun.bulletAngleOffset = 90;
-
-		//  The speed at which the bullet is fired
-		gun.bulletSpeed = bulletSpeed;
-
-		//  Speed-up the rate of fire, allowing them to shoot 1 bullet every 60ms
-		gun.fireRate = fireRate;
-		gun.reloadTime = reloadTime;
-		gun.fullAuto = fullAuto;
-		//gun.multiFire = multiFire
-		gun.bulletAngleVariance = bulletAngleVariance;
-		gun.empty = false
-		gun.bulletKillType = WeaponPlugin.consts.KillType.KILL_WORLD_BOUNDS;
-		gun.startFire = this.startFire.bind(gun)
-		gun.stopFire = this.stopFire.bind(gun)
-		gun.reload = this.reload.bind(gun)
-		gun.reloading = false	
-		const playerObstacles = owner === scene.soldier ? 
-		Object.values(scene.enemies) :
-		[...Object.values(scene.enemies).filter(el => el !== owner), scene.soldier]
-		scene.physics.add.overlap(
-			[...scene.obstacles, ...playerObstacles],
-			gun.bullets,
-			(actor, bullet) => {
-			  // console.log(actor, bullet.damage)
-			  if(actor.texture.key === 'soldier') {
-				if (actor == scene.soldier) {
-					let dead = actor.hb.decrease(5)
-					if (dead) {
-						scene.soldier.setTexture('soldierdead')	// TODO dead emit
-					}
-				} else actor.health -= 5;
-				scene.createBloodEmitter(actor, bullet)
-			  }
-			  // console.log(actor.health)
-			  bullet.kill();
-			}
-		  );
-		gun.on(WeaponPlugin.events.WEAPON_FIRE, (bullet) => {
-			if (owner == scene.soldier) socket.emit('bullet', bullet.body.velocity)
-		});
-		return gun
-	}
-	
-	reload() {
-		if(!this.reloading) {
-			this.scene.sounds.reload.play()
-			this.reloading = true
-			setTimeout(()=>{
-				this.resetShots()
-				this.empty = false
-				this.reloading = false
-				this.scene.sounds.reload.stop()
-			}, this.reloadTime)
-		}
-	}
-	startFire() {
-		
-		if(this.fullAuto) {
-			this.scene.sounds[this.type].play();
-			this.scene.sounds[this.type].setLoop(true)
-			this.autofire = true
-		} else {
-			 if (this.type === 'shotgun') {
-				let tmp = this.fireRate
-				this.fireRate = 0;
-				for (let i = 0; i < this.fireLimit/2; i++) {
-					let bullet = this.fire()
-					if (bullet) this.scene.sounds[this.type].play();
-				}
-				this.fireRate = tmp
-			} else {
-				let bullet = this.fire()
-				if (bullet) this.scene.sounds[this.type].play();
-			}
-
-		}
-	}
-	stopFire() {
-		if(this.fullAuto) {
-			this.autofire = false
-			this.scene.sounds[this.type].setLoop(false)
-			this.scene.sounds[this.type].stop();
-		} 
-
-	}
-}
-
+// TODO обоймы,  увеличение разроса,  вариация урона в зависимости от пули
 class ShooterGame extends Phaser.Scene
 {
 	constructor() {
@@ -171,8 +44,10 @@ class ShooterGame extends Phaser.Scene
             frameWidth: 49,
             frameHeight: 28,
         });
+		this.load.image('loginperson', '/assets/sprites/loginperson.png');
+		this.load.image('loginkey', '/assets/sprites/loginkey.png');
 		this.load.image('soldier_dead', '/assets/sprites/soldierdead.png');
-	    // Load the weapon plugin
+
   		this.load.script('WeaponPlugin', './plugins/WeaponPlugin.min.js');
 		    
 		// this.load.scenePlugin({
@@ -183,10 +58,110 @@ class ShooterGame extends Phaser.Scene
 	}
 
 	create() {
-		socket = io.connect();
 		// Install the weapon pluginClient
 		const text = this.add.text(700, 20, 'War never changes...', { fixedWidth: 185, fixedHeight: 36 })
 		text.setOrigin(0.5, 0.5)
+		var print = this.add.text(0, 0, '');
+		const COLOR_PRIMARY = 0x4e342e;
+		const COLOR_LIGHT = 0x7b5e57;
+		const COLOR_DARK = 0x260e04;
+		
+		const GetValue = Phaser.Utils.Objects.GetValue;
+		var CreateLoginDialog = function (scene, config, onSubmit) {
+			var username = GetValue(config, 'username', '');
+			var password = GetValue(config, 'password', '');
+			var title = GetValue(config, 'title', 'Welcome');
+			var x = GetValue(config, 'x', 0);
+			var y = GetValue(config, 'y', 0);
+			var width = GetValue(config, 'width', undefined);
+			var height = GetValue(config, 'height', undefined);
+		
+			var background = scene.rexUI.add.roundRectangle(0, 0, 10, 10, 10, COLOR_PRIMARY);
+			var titleField = scene.add.text(0, 0, title);
+			var userNameField = scene.rexUI.add.label({
+				orientation: 'x',
+				background: scene.rexUI.add.roundRectangle(0, 0, 10, 10, 10).setStrokeStyle(2, COLOR_LIGHT),
+				icon: scene.add.image(0, 0, 'loginperson'),
+				text: scene.rexUI.add.BBCodeText(0, 0, username, { fixedWidth: 150, fixedHeight: 36, valign: 'center' }),
+				space: { top: 5, bottom: 5, left: 5, right: 5, icon: 10, }
+			})
+				.setInteractive()
+				.on('pointerdown', function () {
+					var config = {
+						onTextChanged: function(textObject, text) {
+							username = text;
+							textObject.text = text;
+						}
+					}
+					scene.rexUI.edit(userNameField.getElement('text'), config);
+				});
+		
+			var passwordField = scene.rexUI.add.label({
+				orientation: 'x',
+				background: scene.rexUI.add.roundRectangle(0, 0, 10, 10, 10).setStrokeStyle(2, COLOR_LIGHT),
+				icon: scene.add.image(0, 0, 'loginkey'),
+				text: scene.rexUI.add.BBCodeText(0, 0, markPassword(password), { fixedWidth: 150, fixedHeight: 36, valign: 'center' }),
+				space: { top: 5, bottom: 5, left: 5, right: 5, icon: 10, }
+			})
+				.setInteractive()
+				.on('pointerdown', function () {
+					var config = {
+						type: 'password',
+						text: password,
+						onTextChanged: function(textObject, text) {
+							password = text;
+							textObject.text = markPassword(password);
+						}
+					};
+					scene.rexUI.edit(passwordField.getElement('text'), config);
+				});
+		
+			var loginButton = scene.rexUI.add.label({
+				orientation: 'x',
+				background: scene.rexUI.add.roundRectangle(0, 0, 10, 10, 10, COLOR_LIGHT),
+				text: scene.add.text(0, 0, 'Login'),
+				space: { top: 8, bottom: 8, left: 8, right: 8 }
+			})
+				.setInteractive()
+				.on('pointerdown', function () {
+					loginDialog.emit('login', username, password);
+				});
+		
+			var loginDialog = scene.rexUI.add.sizer({
+				orientation: 'y',
+				x: x,
+				y: y,
+				width: width,
+				height: height,
+			})
+				.addBackground(background)
+				.add(titleField, 0, 'center', { top: 10, bottom: 10, left: 10, right: 10 }, false)
+				.add(userNameField, 0, 'left', { bottom: 10, left: 10, right: 10 }, true)
+				.add(passwordField, 0, 'left', { bottom: 10, left: 10, right: 10 }, true)
+				.add(loginButton, 0, 'center', { bottom: 10, left: 10, right: 10 }, false)
+				.layout();
+			return loginDialog;
+		};
+		var markPassword = function (password) {
+			return new Array(password.length + 1).join('•');
+		};
+		
+		var loginDialog = CreateLoginDialog(this, {
+			 x: 400,
+			 y: 300,
+			 title: 'Welcome',
+			 username: 'abc',
+			 password: '123',
+		 })
+			 .on('login', function (username, password) {
+				 print.text += `${username}:${password}\n`;
+			 })
+			 //.drawBounds(this.add.graphics(), 0xff0000);
+			 .popUp(500);
+	   
+		 //this.add.text(0, 560, 'Click user name or password field to edit it\nClick Login button to show user name and password')
+		 loginDialog.scaleDownDestroy(100);
+		 loginDialog = undefined;
 		this.plugins.installScenePlugin(
 			'WeaponPlugin',
 			WeaponPlugin.WeaponPlugin,

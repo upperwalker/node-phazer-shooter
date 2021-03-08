@@ -1,3 +1,4 @@
+import WeaponFactory from './WeaponFactory'
 export default class Soldier {
 	constructor(scene, speed, drag, name, health, x = 200, y = 200) {
 	let soldier = scene.physics.add.sprite(x, y, 'soldier');
@@ -11,7 +12,6 @@ export default class Soldier {
 		repeat: -1,
 		frames: scene.anims.generateFrameNames('soldier', {start: 0, end: 2})
 	})
-	this.speed = Phaser.Math.GetSpeed(speed, 1);
 	soldier.selectWeapon = this.selectWeapon.bind(soldier)
 	soldier.startFire = this.startFire.bind(soldier)
 	soldier.stopFire = this.stopFire.bind(soldier)

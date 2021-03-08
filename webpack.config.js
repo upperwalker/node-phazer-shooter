@@ -4,7 +4,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin')
 const CopyPlugin = require("copy-webpack-plugin");
 module.exports = {
     entry: {
-        main: path.resolve(__dirname, './client/js/main.js'),
+        main: path.resolve(__dirname, './client/main.js'),
     },
     output: {
         path: path.resolve(__dirname, './dist'),
@@ -13,7 +13,7 @@ module.exports = {
     plugins: [
         new HtmlWebpackPlugin({
             title: 'Endless war JS',
-            template: path.resolve(__dirname, './client/template.html'), 
+            template: path.resolve(__dirname, './client/index.html'), 
             filename: 'index.html',
         }),
         //new CleanWebpackPlugin(),
