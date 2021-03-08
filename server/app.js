@@ -7,11 +7,7 @@ const server = http.createServer(app);
 server.listen(PORT, () => {
     console.log('Server listening on '+ server.address().port);
 });
-app.use('/js',express.static(path.join(__dirname , '../client/js')));
-app.use('/assets',express.static(path.join(__dirname , '../client/assets')));
-app.get('/', function(req,res){
-    res.sendFile(path.join(__dirname , '../client/index.html'));
-});
+app.use('/',express.static(path.join(__dirname , '../dist')));
 const io = require('socket.io')(server);
 
 const getAllEnemies = (soldierKey) => {

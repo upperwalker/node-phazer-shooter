@@ -1,9 +1,4 @@
 
-class StaticGroup extends Phaser.Physics.Arcade.StaticGroup	{	// TODO for large group of static objects
-	constructor(scene, children) {
-		super(scene.physics.world, scene);
-	}
-}
 
 // TODO 
 
@@ -12,7 +7,19 @@ class StaticGroup extends Phaser.Physics.Arcade.StaticGroup	{	// TODO for large 
 // вариация урона в зависимости от пули
 
 import Test from './class.js'
-console.log(Test)
+
+import Phaser from 'phaser';
+import RexUIPlugin from 'phaser3-rex-plugins/templates/ui/ui-plugin'
+import { io } from "socket.io-client";
+import Soldier from "./classes/Soldier";
+import HealthBar from "./classes/HealthBar";
+
+class StaticGroup extends Phaser.Physics.Arcade.StaticGroup	{	// TODO for large group of static objects
+	constructor(scene, children) {
+		super(scene.physics.world, scene);
+	}
+}
+
 var socket;
 class WeaponFactory {
 	static create(scene, owner, type) {
@@ -132,106 +139,6 @@ class Weapon {
 	}
 }
 
-class Soldier {
-	constructor(scene, speed, drag, name, health, x = 200, y = 200) {
-	let soldier = scene.physics.add.sprite(x, y, 'soldier');
-	soldier.name = name || (+new Date * Math.random()).toString(36).substring(0,5) 
-	soldier.health = health
-	soldier.setCollideWorldBounds(true); 
-	soldier.setDrag(drag)
-	soldier.anims.create({
-		key: 'walk',
-		frameRate: 5,
-		repeat: -1,
-		frames: scene.anims.generateFrameNames('soldier', {start: 0, end: 2})
-	})
-	this.speed = Phaser.Math.GetSpeed(speed, 1);
-	soldier.selectWeapon = this.selectWeapon.bind(soldier)
-	soldier.startFire = this.startFire.bind(soldier)
-	soldier.stopFire = this.stopFire.bind(soldier)
-	soldier.pickUpWeapon = this.pickUpWeapon.bind(soldier)
-	soldier.setPushable(false)
-	return soldier
-	}
-	selectWeapon(newWeapon) {
-		this.weapon = newWeapon
-	}
-	pickUpWeapon(player, sprite) {
-		sprite.disableBody(true, true);
-		let newGun = WeaponFactory.create(player.scene, player, sprite.texture.key)
-		if (this.scene.soldier === player) this.scene.wb.setTexture(newGun.type);
-		else if (newGun.type === 'shotgun') newGun.multiFire = true;
-		this.selectWeapon(newGun)
-		this.ammunition.push(newGun)
-		console.log('pickUpweapon', this.ammunition)
-	}
-	startFire() {
-		this.weapon.startFire()
-	}
-	stopFire() {
-		this.weapon.stopFire()
-	}
-}
-
-class HealthBar {
-
-    constructor (scene, soldier, value, x, y)
-    {
-        this.bar = new Phaser.GameObjects.Graphics(scene);
-		this.soldier = soldier;
-        this.x = x;
-        this.y = y;
-        this.value = value;
-        this.p = 76 / 100;
-
-        this.draw();
-
-        scene.add.existing(this.bar);
-    }
-
-    decrease (amount)
-    {
-        this.value -= amount;
-		this.soldier.health -= amount;
-        if (this.value < 0)
-        {
-            this.value = 0;
-        }
-
-		this.draw();
-
-        return (this.value === 0);
-    }
-
-    draw ()
-    {
-        this.bar.clear();
-
-        //  BG
-        this.bar.fillStyle(0x000000);
-        this.bar.fillRect(this.x, this.y, 80, 16);
-
-        //  Health
-
-        this.bar.fillStyle(0xffffff);
-        this.bar.fillRect(this.x + 2, this.y + 2, 76, 12);
-
-        if (this.value < 30)
-        {
-            this.bar.fillStyle(0xff0000);
-        }
-        else
-        {
-            this.bar.fillStyle(0x00ff00);
-        }
-
-        var d = Math.floor(this.p * this.value);
-
-        this.bar.fillRect(this.x + 2, this.y + 2, d, 12);
-    }
-
-}
-
 class ShooterGame extends Phaser.Scene
 {
 	constructor() {
@@ -266,12 +173,20 @@ class ShooterGame extends Phaser.Scene
         });
 		this.load.image('soldier_dead', '/assets/sprites/soldierdead.png');
 	    // Load the weapon plugin
-  		this.load.script('WeaponPlugin', './js/WeaponPlugin.min.js');
+  		this.load.script('WeaponPlugin', './plugins/WeaponPlugin.min.js');
+		    
+		// this.load.scenePlugin({
+		// 	key: 'rexUI',
+		// 	plugin: RexUIPlugin,
+		// 	mapping: 'rexUI'
+        // });        
 	}
 
 	create() {
 		socket = io.connect();
 		// Install the weapon pluginClient
+		const text = this.add.text(700, 20, 'War never changes...', { fixedWidth: 185, fixedHeight: 36 })
+		text.setOrigin(0.5, 0.5)
 		this.plugins.installScenePlugin(
 			'WeaponPlugin',
 			WeaponPlugin.WeaponPlugin,
@@ -511,7 +426,20 @@ const config = {
 			gravity: { y: 0 }
 		}
 	},
-	scene: ShooterGame
+	scene: ShooterGame,
+	parent: 'phaser-container',
+	dom: {
+		createContainer: true
+	},
+	plugins: {
+		scene: [
+			{
+				key: 'rexUI',
+				plugin: RexUIPlugin,
+				mapping: 'rexUI'
+			}
+		]
+	}
 };
 
 const game = new Phaser.Game(config);
