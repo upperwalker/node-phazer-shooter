@@ -2,9 +2,21 @@ const express = require("express")
 const http = require('http')
 const path = require('path')
 const app = express()
-
 app.use('/',express.static(path.join(__dirname , '../dist')));
 
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.get('/auth', (req, res) => {
+    // TODO - check JWT
+    res.send({
+        authentificated: false,
+        username: ''
+    })
+})
+app.post('/login', (req, res) => {
+    // TODO add JWT
+    console.log(req.body)
+})
 const PORT = process.env.PORT || 80;
 const server = app.listen(PORT, function() {
     let port = server.address().port;
@@ -24,6 +36,10 @@ const getAllEnemies = (soldierKey) => {
 }
 
 io.on('connection',function(socket){
+
+
+    let headers = socket.handshake.headers
+    console.log(headers);
 
     socket.on('addSoldier', function(soldier){
         console.log(`addSoldier ${soldier.name}`)
