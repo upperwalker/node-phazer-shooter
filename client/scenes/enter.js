@@ -1,59 +1,46 @@
 import AuthState from '../state/AuthState'
-import createLoginDialog from '../plugins/LoginDialog'
-export default new Phaser.Class({
-
-    Extends: Phaser.Scene,
-
-
-    preload: function () {
+import createLoginDialog from '../components/LoginDialog'
+import animals from 'animals'
+export default class Enter extends Phaser.Scene {
+    constructor () {
+        super('enter')
+        this.loginDialog;
+    }
+    preload() {
         this.load.image('loginperson', '../assets/sprites/loginperson.png');
-    },
-
-    initialize:
-
-    function MainMenu ()
+    }
+    async create()
     {
-        Phaser.Scene.call(this, { key: 'enter' });
-        window.MENU = this;
-    },
-
-    create: async function ()
-    {
+        const text = this.add.text(700, 20, 'War never changes...', { fixedWidth: 185, fixedHeight: 36 })
+		text.setOrigin(0.5, 0.5)
+        this.cameras.main.backgroundColor = Phaser.Display.Color.HexStringToColor("#556B2F");
         const authState = new AuthState();
         console.log('%c enter ', 'background: green; color: white; display: block;');
-
-
         await authState.getAuth()
         if(authState._authentificated) {
-            console.log('auth - yes')
-                // loginDialog.scaleDownDestroy(100);
-             // loginDialog = undefined;
+            this.scene.start('game')
         } else {
-         console.log('auth - no')
+            let someName = animals()
+            someName = someName.charAt(0).toUpperCase() + someName.slice(1)
             const print = this.add.text(0, 0, '');
-            const loginDialog = createLoginDialog(this, {
+            this.loginDialog = createLoginDialog(this, {
              x: 400,
              y: 300,
-             title: 'Welcome',
-             username: 'abc',
-             password: '123',
+             title: 'Welcome, enter your nickname',
+             username: `Private ${someName}`,
          })
-             .on('login', function (username, password) {
-                 print.text += `${username}:${password}\n`;
+             .on('login', async (username) => {
+                 print.text += `Login: ${username}\n`;
+                 await authState.login({username})
+                 this.scene.start('game')
+                 this.close()
              })
-             //.drawBounds(this.add.graphics(), 0xff0000);
              .popUp(500);
  
         }
-        //var container = this.add.container(400, 300, [ bg, text ]);
-
-        // bg.setInteractive();
-
-        // bg.once('pointerup', function () {
-
-            console.log(this.scene.start('game'));
-
-        // }, this);
     }
-
-});
+    close() {
+        this.loginDialog.scaleDownDestroy(100);
+        this.loginDialog = undefined;
+    }
+}

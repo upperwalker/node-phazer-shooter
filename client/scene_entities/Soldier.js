@@ -29,7 +29,7 @@ export default class Soldier {
 		else if (newGun.type === 'shotgun') newGun.multiFire = true;
 		this.selectWeapon(newGun)
 		this.ammunition.push(newGun)
-		console.log('pickUpweapon', this.ammunition)
+		//console.log('pickUpweapon', this.ammunition)
 	}
 	startFire() {
 		this.weapon.startFire()

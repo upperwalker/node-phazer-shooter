@@ -4,10 +4,10 @@ import HealthBar from "../scene_entities/HealthBar";
 import socket from "../socket";
 import AuthState from '../state/AuthState';
 // TODO обоймы,  увеличение разроса,  вариация урона в зависимости от пули
-export default class ShooterGame extends Phaser.Scene
+export default class Shooter extends Phaser.Scene
 {
 	constructor() {
-		super();
+		super('game');
 
 		this.soldier;
         this.pointer;
@@ -16,12 +16,6 @@ export default class ShooterGame extends Phaser.Scene
 		this.enemies = {};
 		this.authState = new AuthState
 	}
-
-    initialize ()
-    {
-        Phaser.Scene.call(this, { key: 'game' });
-    }
-
 	preload() {
 		this.load.image('bullet', '../assets/sprites/bullet.png');
 		this.load.image('box', '../assets/sprites/box.png');

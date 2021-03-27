@@ -2,20 +2,37 @@ const express = require("express")
 const http = require('http')
 const path = require('path')
 const app = express()
+const jwt = require('jwt-simple')
+var cookieParser = require('cookie-parser')
+
+require('dotenv').config()
+
 app.use('/',express.static(path.join(__dirname , '../dist')));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(cookieParser())
 app.get('/auth', (req, res) => {
-    // TODO - check JWT
-    res.send({
-        authentificated: false,
-        username: ''
+    const token = req.cookies['endlessWarJs']
+    if (!token) return res.send({
+        _authentificated: false,
+        _username: ''
+    })
+    const decoded = jwt.decode(token, process.env.JWT_SECRET);
+    return res.send({
+        _authentificated: true,
+        _username: decoded.username
     })
 })
 app.post('/login', (req, res) => {
-    // TODO add JWT
-    console.log(req.body)
+    const {username} = req.body
+    if (!username) return res.status(401).send('Empty username')
+    const token = jwt.encode({username}, process.env.JWT_SECRET);
+    res.cookie('endlessWarJs', token, {
+        maxAge: 86_400_000,
+        httpOnly: true
+    });
+    return res.send()
 })
 const PORT = process.env.PORT || 80;
 const server = app.listen(PORT, function() {
@@ -39,7 +56,6 @@ io.on('connection',function(socket){
 
 
     let headers = socket.handshake.headers
-    console.log(headers);
 
     socket.on('addSoldier', function(soldier){
         console.log(`addSoldier ${soldier.name}`)

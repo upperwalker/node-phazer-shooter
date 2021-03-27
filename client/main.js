@@ -1,9 +1,6 @@
 import Phaser from 'phaser';
 import RexUIPlugin from 'phaser3-rex-plugins/templates/ui/ui-plugin'
-
-import ShooterGame from './scenes/game'
-import EnterGame from './scenes/enter'
-// TODO GameOver 
+import {Enter, Shooter} from './scenes'
 
 const config = {
 	type: Phaser.AUTO,
@@ -16,7 +13,7 @@ const config = {
 			gravity: { y: 0 }
 		}
 	},
-	scene: [ShooterGame],	// TODO Enter, Gameover
+	scene: [Enter, Shooter],	// Gameover
 	parent: 'phaser-container',
 	dom: {
 		createContainer: true

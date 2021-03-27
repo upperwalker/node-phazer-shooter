@@ -17,7 +17,7 @@
 				orientation: 'x',
 				background: scene.rexUI.add.roundRectangle(0, 0, 10, 10, 10).setStrokeStyle(2, COLOR_LIGHT),
 				icon: scene.add.image(0, 0, 'loginperson'),
-				text: scene.rexUI.add.BBCodeText(0, 0, username, { fixedWidth: 150, fixedHeight: 36, valign: 'center' }),
+				text: scene.rexUI.add.BBCodeText(0, 0, username, { fixedWidth: 180, fixedHeight: 36, valign: 'center' }),
 				space: { top: 5, bottom: 5, left: 5, right: 5, icon: 10, }
 			})
 				.setInteractive()
@@ -35,7 +35,7 @@
 			let loginButton = scene.rexUI.add.label({
 				orientation: 'x',
 				background: scene.rexUI.add.roundRectangle(0, 0, 10, 10, 10, COLOR_LIGHT),
-				text: scene.add.text(0, 0, 'Login'),
+				text: scene.add.text(0, 0, 'Let`s roll!'),
 				space: { top: 8, bottom: 8, left: 8, right: 8 }
 			})
 				.setInteractive()
