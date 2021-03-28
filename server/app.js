@@ -44,13 +44,16 @@ const io = require('socket.io')(server);
 const getAllEnemies = (soldierKey) => {
     var soldiers = [];
     for (let socketID of io.sockets.adapter.rooms.keys()) {
+        console.log(socketID)
         for (const clientId of io.sockets.adapter.rooms.get(socketID) ) {
             const clientSocket = io.sockets.sockets.get(clientId);
+            if (clientSocket && clientSocket.soldier) console.log(clientSocket.soldier.name )
             if (clientSocket && clientSocket.soldier && clientSocket.soldier.name !== soldierKey) soldiers.push(clientSocket.soldier)
        }
     };
     return soldiers;
 }
+
 
 io.on('connection',function(socket){
 
@@ -63,6 +66,7 @@ io.on('connection',function(socket){
         const soldierKey = soldier.name
 
         const enemies = getAllEnemies(soldierKey)
+        console.log(enemies)
         socket.emit('getEnemies', enemies);
         socket.broadcast.emit('getSoldierLocation', socket.id);
         socket.broadcast.emit('addEnemy', soldierKey);
@@ -99,6 +103,13 @@ io.on('connection',function(socket){
 
         socket.on('selectWeapon', function(weaponIndex) {
             socket.broadcast.emit('selectWeapon', soldierKey, weaponIndex);
+        });
+
+        socket.on('leave', function() {
+            socket.broadcast.emit('removeEnemy', soldierKey);
+            // socket.leave('room1', function (err) {
+            //     // ok
+            // });
         });
 
     });

@@ -1,7 +1,7 @@
 import WeaponFactory from './WeaponFactory'
 export default class Soldier {
 	constructor(scene, speed, drag, name, health, x = 200, y = 200) {
-	let soldier = scene.physics.add.sprite(x, y, 'soldier');
+	const soldier = scene.physics.add.sprite(x, y, 'soldier');
 	soldier.name = name || (+new Date * Math.random()).toString(36).substring(0,5) 
 	soldier.health = health
 	soldier.setCollideWorldBounds(true); 

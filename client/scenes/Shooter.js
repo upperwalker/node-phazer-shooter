@@ -2,7 +2,6 @@ import Soldier from "../scene_entities/Soldier";
 import WeaponFactory from "../scene_entities/WeaponFactory";
 import HealthBar from "../scene_entities/HealthBar";
 import socket from "../socket";
-import AuthState from '../state/AuthState';
 // TODO обоймы,  увеличение разроса,  вариация урона в зависимости от пули
 export default class Shooter extends Phaser.Scene
 {
@@ -14,7 +13,7 @@ export default class Shooter extends Phaser.Scene
 		this.inputKeys;
 		this.gunsList;
 		this.enemies = {};
-		this.authState = new AuthState
+		this.authState;
 	}
 	preload() {
 		this.load.image('bullet', '../assets/sprites/bullet.png');
@@ -36,8 +35,10 @@ export default class Shooter extends Phaser.Scene
             frameWidth: 49,
             frameHeight: 28,
         });
-		this.load.image('soldier_dead', '/assets/sprites/soldierdead.png');
-
+		this.load.image('soldier_dead', '../assets/sprites/soldierdead.png');
+	
+		//this.load.bitmapFont('arcade', '../assets/fonts/arcade.png', '../assets/fonts/arcade.xml');
+		this.load.bitmapFont('gothic', '../assets/fonts/gothic.png', '../assets/fonts/gothic.xml');
   		this.load.script('WeaponPlugin', '../plugins/WeaponPlugin.min.js');
 
 		// this.load.scenePlugin({
@@ -46,7 +47,10 @@ export default class Shooter extends Phaser.Scene
 		// 	mapping: 'rexUI'
         // });        
 	}
-
+	init(authState)
+	{
+		this.authState = authState;
+	}
 	async create() {
 		// Install the weapon pluginClient
 		//this.scene.pause();
@@ -99,7 +103,7 @@ export default class Shooter extends Phaser.Scene
 			this.physics.add.sprite(centerX + 150, centerY + 150, 'minigun'),
 		];
 		this.obstacles.forEach(el => el.setPushable(false))
-		this.soldier = new Soldier(this, 200, 2000, null, 100)
+		this.soldier = new Soldier(this, 200, 2000, this.authState.username, 100)
 		this.soldier.ammunition = [WeaponFactory.create(this, this.soldier, 'handgun')];
 		this.soldier.hb = new HealthBar(this, this.soldier, 100, 0, 0);
 		this.wb = this.add.sprite(105, 9, 'handgun'),
@@ -114,6 +118,7 @@ export default class Shooter extends Phaser.Scene
 		socket.on('setPosition', (enemyKey, x, y) => {
 			this.enemies[enemyKey].anims.play('walk', true)
 			Object.assign(this.enemies[enemyKey], {x, y})
+			Object.assign(this.enemies[enemyKey].bindNickName, {x, y: y - 25})
 		});
 		
 		socket.on("setRotation", (enemyKey, rotation) => {
@@ -129,6 +134,7 @@ export default class Shooter extends Phaser.Scene
 		socket.on('removeEnemy', (enemyKey) => {
 			console.log('removeEnemy')
 			this.enemies[enemyKey].destroy(true)
+			this.enemies[enemyKey].bindNickName.destroy()
 			// delete
 		});
 		
@@ -141,6 +147,7 @@ export default class Shooter extends Phaser.Scene
 		socket.on('setEnemyLocation', (enemyKey, x, y, rotation) => {
 			//console.log('setEnemyLocation');
 			Object.assign(this.enemies[enemyKey], {x, y, rotation})
+			Object.assign(this.enemies[enemyKey].bindNickName, {x, y: y - 25})
 		});
 		
 		socket.on('getEnemies', (enemies) => {
@@ -181,6 +188,7 @@ export default class Shooter extends Phaser.Scene
 	addEnemy (enemyKey) {
 		console.log('addEnemy')
 		let enemy = new Soldier(this, 200, 2000, enemyKey, 100)
+		enemy.bindNickName = this.add.dynamicBitmapText(enemy.x, enemy.y - 25, 'gothic', enemyKey, 10).setOrigin(0.5);
 		this.enemies[enemyKey] = enemy
 		enemy.ammunition = [WeaponFactory.create(this, enemy, 'handgun')];
 		enemy.selectWeapon(enemy.ammunition[0])
@@ -284,3 +292,7 @@ export default class Shooter extends Phaser.Scene
         
 	}
 }
+document.addEventListener("visibilitychange", function() {
+	if (document.hidden) socket.emit('leave')
+	else location.reload()
+});

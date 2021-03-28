@@ -18,7 +18,7 @@ export default class Enter extends Phaser.Scene {
         console.log('%c enter ', 'background: green; color: white; display: block;');
         await authState.getAuth()
         if(authState._authentificated) {
-            this.scene.start('game')
+            this.scene.start('game', authState)
         } else {
             let someName = animals()
             someName = someName.charAt(0).toUpperCase() + someName.slice(1)
