@@ -32,7 +32,7 @@ export default class Enter extends Phaser.Scene {
              .on('login', async (username) => {
                  print.text += `Login: ${username}\n`;
                  await authState.login({username})
-                 this.scene.start('game')
+                 this.scene.start('game', authState)
                  this.close()
              })
              .popUp(500);

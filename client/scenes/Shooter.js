@@ -31,6 +31,9 @@ export default class Shooter extends Phaser.Scene
 		this.load.audio('minigun', '../assets/sounds/minigun.wav')
 		this.load.audio('reload', '../assets/sounds/reload.wav')
 		this.load.audio('empty', '../assets/sounds/empty.wav')
+
+		this.load.audio('paranoid',  '../assets/music/paranoid.mp3');
+
         this.load.spritesheet('soldier', '../assets/sprites/soldier.png', {
             frameWidth: 49,
             frameHeight: 28,
@@ -112,6 +115,9 @@ export default class Shooter extends Phaser.Scene
 		this.physics.add.collider(this.soldier, this.obstacles);
 		this.addEvents();
 
+		const music = this.sound.add('paranoid');
+		music.play();
+
 		// socket messages handle
 		socket.emit('addSoldier', this.soldier);
 
@@ -165,6 +171,12 @@ export default class Shooter extends Phaser.Scene
 		});
 		socket.on('selectWeapon', (enemyKey, weaponIndex) => {
 			this.enemies[enemyKey].selectWeapon(this.enemies[enemyKey].ammunition[weaponIndex])      
+		});
+		socket.on('dead', (enemyKey) => {
+			const dead = this.add.sprite(this.enemies[enemyKey].x, this.enemies[enemyKey].y, 'soldier_dead')
+			setTimeout(()=> { dead.destroy() }, 1000)
+			this.enemies[enemyKey].destroy(true)
+			this.enemies[enemyKey].bindNickName.destroy()
 		});
 
 	}

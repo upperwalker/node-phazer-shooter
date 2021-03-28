@@ -42,7 +42,9 @@ export default class Weapon {
 				if (actor == scene.soldier) {
 					let dead = actor.hb.decrease(5)
 					if (dead) {
-						scene.soldier.setTexture('soldierdead')	// TODO dead emit
+						scene.add.sprite(scene.soldier.x, scene.soldier.y, 'soldier_dead')	// TODO gameover
+						scene.soldier.visible = false;
+						socket.emit('dead')
 					}
 				} else actor.health -= 5;
 				scene.createBloodEmitter(actor, bullet)

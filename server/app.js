@@ -111,6 +111,9 @@ io.on('connection',function(socket){
             //     // ok
             // });
         });
+        socket.on('dead', function() {
+            socket.broadcast.emit('dead', soldierKey);
+        });
 
     });
 });
